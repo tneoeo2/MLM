@@ -15,12 +15,14 @@ from module.custom_logger import CustomLogger
 
 logging = CustomLogger("INFO").get_logger()
 
-def close_pop(driver):
+def close_alert(driver):
     try:
-        pop_up = driver.find_element_by_class_name("closeBtn")
-        if pop_up is not None:
+        alert = driver.find_element_by_class_name("closeBtn")
+        # alert = driver.switch_to.alert
+        if alert is not None:
             logging.info("popup닫기")
-            pop_up.click()
+            # alert.accept()
+            alert.click()
     except Exception as e:
         logging.error("팝업 없음 : %s", e)
 
@@ -31,7 +33,7 @@ class TicketModule():
     '''
     def __init__(self, driver):
         self.driver = driver
-        self.wait = WebDriverWait(self.driver, 5)
+        self.wait = WebDriverWait(self.driver, 4)
         
     
     def login_go(self, url, id, pwd): #로그인 함수
@@ -63,13 +65,15 @@ class TicketModule():
         '''
         logging.info("date_select 작동 확인")
         
-        close_pop(self.driver)
+        close_alert(self.driver)
             
         while (True):
             try: 
                 self.driver.switch_to.default_content()
                 # print("frame 교체 시도!")
-                self.driver.switch_to.frame(self.driver.find_element_by_id('ifrmBookStep'))
+                t_ifrm = self.driver.find_element_by_id('ifrmBookStep')
+                self.wait.until(EC.frame_to_be_available_and_switch_to_it(t_ifrm))
+                # self.driver.switch_to.frame(self.driver.find_element_by_id('ifrmBookStep'))
                 if int(date[0]) == 0:   #입력한 월 가져오기
                     pass
                 elif int(date[0])  >= 1:  #입력한 월이 이번달이 아닌 경우
@@ -99,7 +103,8 @@ class TicketModule():
         if opt == 1:
             logging.info("캡차 인식 실행")
             self.driver.switch_to.default_content()
-            self.driver.switch_to.frame(self.driver.find_element_by_name("ifrmSeat"))
+            self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_name("ifrmSeat")))
+            # self.driver.switch_to.frame(self.driver.find_element_by_name("ifrmSeat"))
             img_captcha = self.wait.until(EC.presence_of_element_located((By.ID, 'imgCaptcha')))
             src = img_captcha.get_attribute('src')
             img_path = './img_captcha.png'
@@ -110,10 +115,17 @@ class TicketModule():
             'accept': 'application/json',
             }
             files = {'file': (os.path.basename(img_path), open(img_path, 'rb'), 'image/png')}
-            response = requests.post(url, headers=headers, files=files)
-            json_response = json.loads(response.text)
-            text_captcha = json_response['preds'][0]
-            
+            text_captcha = 0
+            try:
+                response = requests.post(url, headers=headers, files=files)
+            except Exception as e:
+                logging.error(f'Error creating {e}')
+            try:
+                json_response = json.loads(response.text)
+                text_captcha = json_response['preds'][0]
+            except json.JSONDecodeError as e:
+                logging.error(f"JSON decoding error: {e}")
+            # print("response: " , response.text)
             print(f'Response status code: {response.status_code}')
             print(f'Response content: {response.content.decode("utf-8")}')
         
@@ -122,6 +134,15 @@ class TicketModule():
             self.driver.find_element_by_id("txtCaptcha").send_keys(text_captcha)
             self.driver.find_element_by_id("txtCaptcha").send_keys(Keys.ENTER)
             #!캡차 인식 실패시 재시도 추가
+            captcha_fail = self.driver.find_element(By.CLASS_NAME, 'validationTxt')
+            border_color_default = "rgb(170, 170, 170)"
+            border_color = captcha_fail.value_of_css_property('border-color')
+            logging.info('border_color: %s', border_color)
+            if border_color != border_color_default:
+                logging.info('Captcha 인식 실패')
+                self.read_captcha(url, opt)
+            
+            
                 
         else:
             logging.info("캡차 인식 미사용")
@@ -129,39 +150,56 @@ class TicketModule():
     
         
         
-    def seat_select(self, t_seat=1):
+    def seat_select(self, t_seat=1, seat_name=None):
         '''
         좌석 선택함수
         t_seat : 선택할 좌석 수
+        seat_name : 선택할 좌석명 (ex. R석, VIP석 등)
         birth : 생일정보
         '''
         self.t_seat = t_seat
         self.driver.switch_to.default_content()   #!  상위로 이동
-        self.driver.switch_to.frame(self.driver.find_element_by_name("ifrmSeat"))
-        self.driver.switch_to.frame(self.driver.find_element_by_name("ifrmSeatDetail"))
+        self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_name("ifrmSeat")))
+        # self.driver.switch_to.frame(self.driver.find_element_by_name("ifrmSeat"))
+        self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_name("ifrmSeatDetail")))
+        # self.driver.switch_to.frame(self.driver.find_element_by_name("ifrmSeatDetail"))
+        
+        ##? 변경전 좌석선택 코드
+        # try:
+        #     logging.info("보라색 좌석 시도")
+        #     self.wait.until(EC.presence_of_element_located(    #원하는 요소가 뜰때까지 대기
+        #         (By.CSS_SELECTOR, 'img[src="http://ticketimage.interpark.com/TMGSNAS/TMGS/G/1_90.gif"]')))   #보라색 이미지 css 경로
+        #     seats = self.driver.find_elements_by_css_selector(
+        #         'img[src="http://ticketimage.interpark.com/TMGSNAS/TMGS/G/1_90.gif"]')
+        # except Exception:
+        #     logging.info("초록색 좌석 시도")
+        #     self.wait.until(EC.presence_of_element_located(    #원하는 요소가 뜰때까지 대기
+        #         (By.CLASS_NAME, 'stySeat')))   #초록 이미지 css 경로
+        #     seats = self.driver.find_elements_by_class_name(
+        #         'stySeat')
+        seats = 0
+        self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'stySeat')))   #초록 이미지 css 경로
         try:
-            logging.info("보라색 좌석 시도")
-            self.wait.until(EC.presence_of_element_located(    #원하는 요소가 뜰때까지 대기
-                (By.CSS_SELECTOR, 'img[src="http://ticketimage.interpark.com/TMGSNAS/TMGS/G/1_90.gif"]')))   #보라색 이미지 css 경로
-            seats = self.driver.find_elements_by_css_selector(
-                'img[src="http://ticketimage.interpark.com/TMGSNAS/TMGS/G/1_90.gif"]')
-        except Exception:
-            logging.info("초록색 좌석 시도")
-            self.wait.until(EC.presence_of_element_located(    #원하는 요소가 뜰때까지 대기
-                (By.CLASS_NAME, 'stySeat')))   #초록 이미지 css 경로
-            seats = self.driver.find_elements_by_class_name(
-                'stySeat')
+            if seat_name is not None : 
+                for i in range(len(seat_name)):
+                    logging.info("{} 좌석 선택 시도".format(seat_name[i]))
+                    xpath = f'//img[contains(@title,"{seat_name[i]}")]'
+                    # self.wait.until(EC.presence_of_element_located((By.XPATH, xpath)))  #원하는 요소가 뜰때까지 대기'
+                    seats = self.driver.find_elements_by_xpath(xpath)
+                    if len(seats) >= self.t_seat:
+                        break
+        except:
+            logging.info("입력한 등급의 좌석이 남아있지 않습니다. --> 남은 좌석 중 랜덤 선택")
+            seats = self.driver.find_elements_by_class_name('stySeat')
+            
             
         logging.info("남은 좌석 수: {}".format(len(seats)))   #남아있는 좌석 수
-        
-        """ 무조건 앞열 기준 잡기시작, 
-        """
         self.seat_count = 0 #실제 예매할 좌석의 수
         if self.t_seat > len(seats):   # 잡을 좌석 수 > 남은 좌석 수
-            seat_count = len(seats)                 #남은 좌석만큼 가져오기
+            self.seat_count = len(seats)                 #남은 좌석만큼 가져오기
         else:
-            seat_count = self.t_seat             #입력한 좌석 수만큼 가져오기
-        for i in range(0, seat_count):
+            self.seat_count = self.t_seat             #입력한 좌석 수만큼 가져오기
+        for i in range(0, self.seat_count):
             seats[i].click()     #시트 클릭
         logging.info("좌석 선택 완료!")
         self.driver.switch_to.default_content()
@@ -173,10 +211,14 @@ class TicketModule():
 
     ##? 가격할인권종 선택
     def discount(self, opt=0):
+        '''
+        opt : 0(일반), 1(재관)
+        '''
         logging.info("---권종선택 수행---")
         #일반 
         self.driver.switch_to.default_content()
-        self.driver.switch_to.frame(self.driver.find_element_by_xpath('//*[@id="ifrmBookStep"]'))
+        self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element(By.XPATH,'//*[@id="ifrmBookStep"]')))
+        # self.driver.switch_to.frame(self.driver.find_element_by_xpath('//*[@id="ifrmBookStep"]'))
         if opt == 0:
             # pricegradename 값
             desired_pricegradename = "일반"
@@ -205,7 +247,7 @@ class TicketModule():
             
         self.driver.switch_to.default_content() 
         self.driver.find_element_by_id("SmallNextBtnImage").click()
-        close_pop(self.driver)            
+        close_alert(self.driver)            
 
             
         
@@ -242,7 +284,8 @@ class TicketModule():
 
         def task():
             self.driver.switch_to.default_content()
-            self.driver.switch_to.frame(self.driver.find_element_by_xpath('//*[@id="ifrmBookStep"]'))
+            self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_xpath('//*[@id="ifrmBookStep"]')))
+            #self.driver.switch_to.frame(self.driver.find_element_by_xpath('//*[@id="ifrmBookStep"]'))
             logging.info("생일 입력 확인 : {}".format(self.birth))
             self.wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="YYMMDD"]'))).send_keys(birth)    #생년월일 입력
             # self.driver.find_element_by_xpath('//*[@id="SmallNextBtnImage"]').click()
