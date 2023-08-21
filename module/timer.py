@@ -47,7 +47,7 @@ class SetTimer:
             logging.info(formatted_time)
     
             if m == int(self.end_time[3:5]):  # 목표시간 도달하면
-                if s - 1 == int(self.end_time[6:8]) and msec >= 500 :
+                if s - 1 == int(self.end_time[6:8]) and msec >= 700 :
                     logging.info(f"타이머 종료... {self.current_time}")
                     return 1
                 elif s == int(self.end_time[6:8]) :
