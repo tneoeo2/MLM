@@ -48,12 +48,19 @@ class TicketModule():
         self.driver.find_element_by_id('userPwd').send_keys(pwd) #입력받은 pwd값 전달
         self.driver.find_element_by_id('btn_login').click() #로그인 버튼 클릭 이벤트
     
-    def link_go(self, mc_code):  #티켓예매페이지로 이동
+    def link_go(self, mc_code, alert=False):  #티켓예매페이지로 이동
         '''
         mc_code: 예매할 공연 번호
+        alert : 팝업 유무
         '''
-        book_url = "http://poticket.interpark.com/Book/BookSession.asp?GroupCode="
-        self.driver.get(book_url+str(mc_code))
+        self.mc_code = mc_code
+        try:
+            book_url = "http://poticket.interpark.com/Book/BookSession.asp?GroupCode="
+            self.driver.get(book_url+str(self.mc_code))
+            if alert : 
+                close_alert(self.driver)
+        except :
+            self.link_go(self.mc_code, alert=True)
         
         
         
@@ -64,12 +71,10 @@ class TicketModule():
         times : 회차정보 (1부터 센다)
         '''
         logging.info("date_select 작동 확인")
-        
-        close_alert(self.driver)
-            
         while (True):
             try: 
                 self.driver.switch_to.default_content()
+                
                 # print("frame 교체 시도!")
                 t_ifrm = self.driver.find_element_by_id('ifrmBookStep')
                 self.wait.until(EC.frame_to_be_available_and_switch_to_it(t_ifrm))
@@ -84,10 +89,10 @@ class TicketModule():
                     self.driver.find_element_by_link_text(date[1]).click()   
                     break
                 except NoSuchElementException:    #찾는 요소 없을 경우 직링함수 재실행
-                    self.link_go()
+                    self.link_go(self.mc_code, True)
                     break
             except NoSuchElementException: 
-                self.link_go()
+                self.link_go(self.mc_code, True)
                 break
         self.wait.until(EC.element_to_be_clickable(     
             (By.XPATH, '/html/body/div/div[3]/div[1]/div/span/ul/li[' + times + ']/a'))).click()  #회차 클릭
@@ -142,8 +147,6 @@ class TicketModule():
                 logging.info('Captcha 인식 실패')
                 self.read_captcha(url, opt)
             
-            
-                
         else:
             logging.info("캡차 인식 미사용")
     
@@ -164,28 +167,20 @@ class TicketModule():
         self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_name("ifrmSeatDetail")))
         # self.driver.switch_to.frame(self.driver.find_element_by_name("ifrmSeatDetail"))
         
-        ##? 변경전 좌석선택 코드
-        # try:
-        #     logging.info("보라색 좌석 시도")
-        #     self.wait.until(EC.presence_of_element_located(    #원하는 요소가 뜰때까지 대기
-        #         (By.CSS_SELECTOR, 'img[src="http://ticketimage.interpark.com/TMGSNAS/TMGS/G/1_90.gif"]')))   #보라색 이미지 css 경로
-        #     seats = self.driver.find_elements_by_css_selector(
-        #         'img[src="http://ticketimage.interpark.com/TMGSNAS/TMGS/G/1_90.gif"]')
-        # except Exception:
-        #     logging.info("초록색 좌석 시도")
-        #     self.wait.until(EC.presence_of_element_located(    #원하는 요소가 뜰때까지 대기
-        #         (By.CLASS_NAME, 'stySeat')))   #초록 이미지 css 경로
-        #     seats = self.driver.find_elements_by_class_name(
-        #         'stySeat')
         seats = 0
         self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'stySeat')))   #초록 이미지 css 경로
         try:
             if seat_name is not None : 
                 for i in range(len(seat_name)):
-                    logging.info("{} 좌석 선택 시도".format(seat_name[i]))
-                    xpath = f'//img[contains(@title,"{seat_name[i]}")]'
+                    logging.info("{} 좌석 선택 시도".format(seat_name[i][0]))
+                    #! 기본
+                    # xpath = f'//img[contains(@title,"{seat_name[i]}")]'
+                    #? 리터럴
+                    # xpath = f'//img[contains(@title,"{seat_name[i]}") and contains(@title,"1층") and contains(@title,"B")]'
+                    css_selector = f'img[title*="{seat_name[i][0]}"][title*="{seat_name[i][1]}"]'
                     # self.wait.until(EC.presence_of_element_located((By.XPATH, xpath)))  #원하는 요소가 뜰때까지 대기'
-                    seats = self.driver.find_elements_by_xpath(xpath)
+                    seats = self.driver.find_elements_by_css_selector(css_selector)  #*선택자로 가져오기
+                    # seats = self.driver.find_elements_by_xpath(xpath)   #*xpath로 탐색 
                     if len(seats) >= self.t_seat:
                         break
         except:
@@ -259,6 +254,7 @@ class TicketModule():
         self.pay_opt = pay_opt
         self.birth = birth
         logging.info("---결제 수행---")
+        
         def bank():  #무통장
             self.wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="Payment_22004"]/td/input'))).click()
             self.wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="BankCode"]/option[7]'))).click()
@@ -267,6 +263,7 @@ class TicketModule():
             self.driver.switch_to.frame(self.driver.find_element_by_xpath('//*[@id="ifrmBookStep"]'))
             self.wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="checkAll"]'))).click()
             self.driver.switch_to.default_content()
+            ##! 실사용시 주석 해제 후 사용할 것!!!
             # self.driver.find_element_by_xpath('//*[@id="LargeNextBtnImage"]').click()    #?실결제는 주석처리
             
         def kakao(): #카카오
@@ -287,7 +284,7 @@ class TicketModule():
             self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_xpath('//*[@id="ifrmBookStep"]')))
             #self.driver.switch_to.frame(self.driver.find_element_by_xpath('//*[@id="ifrmBookStep"]'))
             logging.info("생일 입력 확인 : {}".format(self.birth))
-            self.wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="YYMMDD"]'))).send_keys(birth)    #생년월일 입력
+            self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'input#YYMMDD'))).send_keys(birth)    #생년월일 입력
             # self.driver.find_element_by_xpath('//*[@id="SmallNextBtnImage"]').click()
             self.driver.switch_to.default_content()
             self.driver.find_element_by_xpath('//*[@id="SmallNextBtnImage"]').click()
