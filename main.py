@@ -24,6 +24,10 @@ TEST_ID = test_data['TEST_USER']['ID']
 TEST_PW = test_data['TEST_USER']['PW']
 TEST_BIRTH = test_data['TEST_USER']['BIRTH']
 
+# TEST_ID = test_data['SOOIN']['ID']
+# TEST_PW = test_data['SOOIN']['PW']
+# TEST_BIRTH = test_data['SOOIN']['BIRTH']
+
 
 TEST_MC = test_data['TEST_MC']['오유']
 CAPTCHA_URL = test_data['CAPTCHA_URL']
@@ -57,15 +61,15 @@ class TicketThread():
     def get_ticket(self):
         logging.info('---공연선택 시작---')
         #!공연선택
-        self.tm.link_go(TEST_MC)
-        #!날짜 선택 & 7회차 선택
-        self.tm.date_select(['0', '29'], '1')
-        # self.tm.date_select(['2', '3'], '1')
+        self.tm.common_link_go(TEST_MC)
+        #!날짜 선택[현재월+n,n일, n회차] & 7회차 선택
+        # self.tm.date_select(['1', '8'], '1')
+        self.tm.common_date_select(['1', '22'], '1')
         #!캡차 유무 선택 
         self.tm.read_captcha(url = CAPTCHA_URL, opt = 1)
-        #!좌석 선택(좌석이름, 구역 순 입력)
-        seat_name = [["VIP", "B"], ["VIP", "C"], ["VIP", "A"], ["R", "B"], ["R", "A"], ["R", "C"]]
-        self.tm.seat_select(1, seat_name=seat_name)
+        #!좌석 선택(좌석수, [좌석이름, 구역] 입력)
+        seat_name = [["VIP", "B"], ["VIP", "C"], ["VIP", "A"], ["R", "B"], ["R", "C"], ["R", "A"]]
+        self.tm.seat_select(2, seat_name=seat_name)
         #!할인권종 선택
         self.tm.discount(0)
         #!결제 선택 - 무통장(0) -> 카카오(1)
@@ -81,10 +85,10 @@ class TicketThread():
         self.get_ticket()
         
 # test_time = '14:00:00'    #?타이머 테스트용 
-test_time = '00:22:00'    #?타이머 테스트용 
+# test_time = '00:22:00'    #?타이머 테스트용 
 #!타임스레드 실행
 #?타이머 불러오기 (다른 스레드 생성하여 진행)
-
 ticketing_thread = threading.Thread(target=TicketThread().run)
+# ticketing_thread = threading.Thread(target=TicketThread(test_time).run)
 ticketing_thread.start()
 logging.info("티켓팅스레드 실행")
