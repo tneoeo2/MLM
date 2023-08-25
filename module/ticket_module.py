@@ -149,15 +149,22 @@ class TicketModule():
         '''
         logging.info("common_date_select 작동 확인")
         common_close_alert(self.driver)
-        # current = self.driver.find_element(By.CSS_SELECTOR, "li[data-view='month current']")
-        # current_mon = current.text.split(".")[-1].strip() #현재 월 확인
-        # logging.info(f"Current month: {current_mon}")
+        current = self.driver.find_element(By.CSS_SELECTOR, "li[data-view='month current']")
+        current_mon = int(current.text.split(".")[-1].strip()) #현재 월 확인
+        t_mon = int(date[0])
+        logging.info(f"Current month: {current_mon}")
         while (True):
             try:
-                if int(date[0]) == 0:   #입력한 월 가져오기
+                if t_mon == current_mon:   #입력한 월 가져오기
                         pass
-                elif int(date[0]) >= 1:  #입력한 월이 이번달이 아닌 경우
-                    for _ in range(int(date[0])):
+                elif t_mon != current_mon:  #입력한 월이 이번달이 아닌 경우
+                    change = t_mon-current_mon
+                    if change < 0 :  #예매월이 다음 달로 넘어가는 경우
+                        t_mon += 12
+                        change = t_mon-current_mon
+                    else:
+                        pass
+                    for _ in range(change):
                         scroll_to(self.driver, ['document.body.scrollWidth', 0])
                         self.driver.find_element(By.CSS_SELECTOR, "li[data-view='month next']").click()
                 try:
