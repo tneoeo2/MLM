@@ -20,13 +20,13 @@ test_data  = ''
 with open('test.json', encoding='UTF8') as f:
     test_data = json.load(f)
     
-TEST_ID = test_data['TEST_USER']['ID']
-TEST_PW = test_data['TEST_USER']['PW']
-TEST_BIRTH = test_data['TEST_USER']['BIRTH']
+# TEST_ID = test_data['TEST_USER']['ID']
+# TEST_PW = test_data['TEST_USER']['PW']
+# TEST_BIRTH = test_data['TEST_USER']['BIRTH']
 
-# TEST_ID = test_data['SOOIN']['ID']
-# TEST_PW = test_data['SOOIN']['PW']
-# TEST_BIRTH = test_data['SOOIN']['BIRTH']
+TEST_ID = test_data['SOOIN']['ID']
+TEST_PW = test_data['SOOIN']['PW']
+TEST_BIRTH = test_data['SOOIN']['BIRTH']
 
 
 # TEST_MC = test_data['TEST_MC']['더데빌']
@@ -57,8 +57,13 @@ def get_driver():
 
 
 class TicketThread():
-    def __init__(self, time=None):
-        self.time = time
+    def __init__(self, time=None, account:list, t_date:list, t_time:int, is_cap:int, seat_cnt:int, payment:int):
+        self.start_time = time
+        self.account = account
+        self.t_date = t_date
+        self.t_time = t_time
+        self.is_cap = is_cap
+        self.payment = payment
         
     def start_driver(self):
         logging.info("---드라이버 가져오기---")
@@ -67,20 +72,21 @@ class TicketThread():
         #!사이트 접속(인터파크)
         logging.info("---티켓팅 모듈 실행---")
         self.tm = TicketModule(self.driver)
-        self.tm.login_go(INTERPARK_LOGIN_URL, TEST_ID, TEST_PW)
+        self.tm.login_go(INTERPARK_LOGIN_URL, self.account[0], self.account[1])
     
     def get_ticket(self):
         logging.info('---공연선택 시작---')
         #!공연선택
         self.tm.common_link_go(TEST_MC)
-        #!날짜 선택[현재월+n,n일, n회차] & 7회차 선택
-        # self.tm.date_select(['1', '8'], '1')
-        self.tm.common_date_select(['1', '22'], '1')
+        #!날짜 선택[현재월+n,n일, n회차] & 회차 선택
+        self.tm.common_date_select(self.t_date, self.t_time)
+        # self.tm.common_date_select(['1', '22'], '1')
         #!캡차 유무 선택 
-        self.tm.read_captcha(url = CAPTCHA_URL, opt = 1)
+        self.tm.read_captcha(url = CAPTCHA_URL, opt = 0)
         #!좌석 선택(좌석수, [좌석이름, 구역] 입력)
-        seat_name = [["VIP", "B"], ["VIP", "C"], ["VIP", "A"], ["R", "B"], ["R", "C"], ["R", "A"]]
-        self.tm.seat_select(2, seat_name=seat_name)
+        # seat_name = [["VIP", "B"], ["VIP", "C"], ["VIP", "A"], ["R", "B"], ["R", "C"], ["R", "A"]]
+        seat_name = [["VIP"], ["R"], ["1층"]]
+        self.tm.seat_select(1, seat_name=seat_name)
         #!할인권종 선택
         self.tm.discount(0)
         #!결제 선택 - 무통장(0) -> 카카오(1)
@@ -88,7 +94,7 @@ class TicketThread():
 
     def run(self):
         self.start_driver()
-        self.timer_instance = timer.SetTimer(self.time)
+        self.timer_instance = timer.SetTimer(self.start_time)
         time_thread = threading.Thread(target=self.timer_instance.run)
         logging.info("타임스레드 실행")
         time_thread.start()
@@ -96,6 +102,7 @@ class TicketThread():
         self.get_ticket()
         
 # test_time = '14:00:00'    #?타이머 테스트용 
+test_time = '13:00:00'    #?타이머 테스트용 
 # test_time = '00:22:00'    #?타이머 테스트용 
 #!타임스레드 실행
 #?타이머 불러오기 (다른 스레드 생성하여 진행)

@@ -27,7 +27,7 @@ class SetTimer:
     def __init__(self, end_time: str = None):
         self.end_time = end_time
         if self.end_time is None:
-            self.end_time = datetime.datetime.now() + datetime.timedelta(seconds=5)
+            self.end_time = datetime.datetime.now() + datetime.timedelta(seconds=3)
             self.end_time = self.end_time.strftime("%H:%M:%S:%f")[:-3]
             logging.info("목표시간 : {}".format(self.end_time))
         else:
@@ -47,7 +47,7 @@ class SetTimer:
             logging.info("formatted_time : %s", formatted_time)
     
             if m == int(self.end_time[3:5]):  # 목표시간 도달하면
-                if s - 1 == int(self.end_time[6:8]) and msec >= 700 :
+                if s - 1 == int(self.end_time[6:8]) and msec >= 900 :
                     logging.info(f"타이머 종료... {self.current_time}")
                     return 1
                 elif s == int(self.end_time[6:8]) :
