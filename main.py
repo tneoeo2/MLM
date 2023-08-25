@@ -29,12 +29,23 @@ TEST_BIRTH = test_data['TEST_USER']['BIRTH']
 # TEST_BIRTH = test_data['SOOIN']['BIRTH']
 
 
-TEST_MC = test_data['TEST_MC']['오유']
+# TEST_MC = test_data['TEST_MC']['더데빌']
+TEST_MC = test_data['TEST_MC']['블메포']
 CAPTCHA_URL = test_data['CAPTCHA_URL']
 
 INTERPARK_LOGIN_URL = "https://ticket.interpark.com/Gate/TPLogin.asp"
 
 logging = CustomLogger("INFO").get_logger()
+
+#사이트 주소
+account = [TEST_ID, TEST_PW] #로그인 정보(ID, PW)
+t_date = [0, 22], #회차정보[[월, 일], 회차]
+t_time = 2
+is_cap = 0   #캡차유무 설정 (0: 미사용, 1: 사용)
+seat_cnt = 1 #좌석수
+payment = 0  #결제 방법 선택(무통장:0, 카카오:1)
+start_time = '14:00:00'    #?타이머 테스트용 
+
 
 #?웹드라이버 불러오기(크롬)
 def get_driver():
