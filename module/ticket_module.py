@@ -6,7 +6,7 @@ import urllib.request
 from requests_toolbelt import MultipartEncoderMonitor
 from urllib3.exceptions import NewConnectionError
 from selenium import webdriver
-from selenium.common.exceptions import NoSuchElementException
+from selenium.common.exceptions import NoSuchElementException, ElementClickInterceptedException
 from selenium.common.exceptions import UnexpectedAlertPresentException
 from selenium.common.exceptions import TimeoutException
 from selenium.webdriver.common.by import By
@@ -33,6 +33,7 @@ def close_alert(driver):
             logging.info("popup닫기")
             # alert.accept()
             alert.click()
+            return True
     except Exception as e:
         logging.error("팝업 없음 : %s", e)
         
@@ -63,12 +64,13 @@ def go_navi(driver, opt=2):
 # 대기열 떳을 경우 기다리기
 def waiting_order(driver):
     try:
-        is_waiting = driver.find_element(By.CLASS_NAME, "ticketWaiting__order")
+        is_waiting =  WebDriverWait(driver, 4).until(EC.presence_of_element_located(By.CLASS_NAME, "ticketWaiting__order"))
         while True:
             if is_waiting :
+                # WebDriverWait(driver, 4).until(EC.presence_of_element_located((By.CLASS_NAME, 'notranslate'))) 
                 waiting_num = driver.find_element(By.CLASS_NAME, "notranslate")
-                time.sleep(3)
-                logging.info(f"대기중...{waiting_num}")
+                time.sleep(1)
+                logging.info(f"대기중...{waiting_num.text}")   #span 클래스 : notranslate 값가져오기
                 pass
             else:
                 logging.info("대기열 없음..")
@@ -139,6 +141,7 @@ class TicketModule():
             if alert : 
                 common_close_alert(self.driver)
         except Exception as e:
+            self.common_link_go(mc_code, alert)
             logging.error(f"Exception e : {e}")
             
     def common_date_select(self, date:list, times):
@@ -148,7 +151,7 @@ class TicketModule():
         times : 회차정보 (1부터 센다)
         '''
         logging.info("common_date_select 작동 확인")
-        common_close_alert(self.driver)
+        # common_close_alert(self.driver)
         current = self.driver.find_element(By.CSS_SELECTOR, "li[data-view='month current']")
         current_mon = int(current.text.split(".")[-1].strip()) #현재 월 확인
         t_mon = int(date[0])
@@ -176,10 +179,16 @@ class TicketModule():
                     break
                 except NoSuchElementException:    #찾는 요소 없을 경우 직링함수 재실행
                     self.common_link_go(self.mc_code, True)
-                    break
+                    self.common_date_select(date, times)
+                    return
             except NoSuchElementException: 
                 self.common_link_go(self.mc_code, True)
-                break
+                self.common_date_select(date, times)
+                return
+            except ElementClickInterceptedException:
+                self.common_link_go(self.mc_code, True)
+                self.common_date_select(date, times)
+                return
         self.driver.switch_to.default_content()
         scroll_to(self.driver, ['document.body.scrollWidth', 'document.body.scrollHeight'])   #스크롤 내리기
         times_loc = f'//a[contains(@data-text,"{times}")]'
@@ -194,10 +203,12 @@ class TicketModule():
             window_handles = self.driver.window_handles
             self.driver.switch_to_window(window_handles[-1])
             self.driver.find_element_by_xpath('//*[@id="productSide"]/div/div[2]/a[1]').click()
+            time.sleep(0.5)
+            self.ticket_windows = switch_window(self.driver, current_windows)
         except Exception as e:
             logging.error(f'팝업닫기중 오류 ---{e}')
-        waiting_order(self.driver)
-        self.ticket_windows = switch_window(self.driver, current_windows)
+            self.ticket_windows = switch_window(self.driver, current_windows)
+        # waiting_order(self.driver)
         
      
     def link_go(self, mc_code, alert=False):  #티켓예매페이지로 이동
@@ -262,9 +273,15 @@ class TicketModule():
                 logging.info("캡차 인식 실행")
                 self.driver.switch_to.default_content()   #!  상위로 이동
                 # self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_name("ifrmSeat")))
-                logging.info(f'iframe 확인 2 : {self.driver.find_element_by_name("ifrmSeat")}')
-                self.driver.switch_to.frame(self.driver.find_element(By.ID, "ifrmSeat"))
-                logging.info("캡차 인식 실행3")
+                # logging.info(f'iframe 확인 2 : {self.driver.find_element_by_name("ifrmSeat")}')
+                try:
+                    self.driver.switch_to.frame(self.driver.find_element(By.ID, "ifrmSeat"))
+                except Exception as e:
+                    close_alert(self.driver)
+                    logging.error(f"캡차 이미지 없음 : {e}")
+                    waiting_order(self.driver)
+                    self.driver.switch_to.frame(self.driver.find_element(By.ID, "ifrmSeat"))
+                # logging.info("캡차 인식 실행3")
                 img_captcha = self.wait.until(EC.presence_of_element_located((By.ID, 'imgCaptcha')))
                 src = img_captcha.get_attribute('src')
                 img_path = './img_captcha.png'
@@ -315,82 +332,158 @@ class TicketModule():
                     logging.info("캡차 입력 완료")
                     break                    
             
+    def coord_seat_select(self, seat_name:str=None): #좌표로 좌석가져오기
+        '''
+        좌석 선택함수
+        t_seat : 선택할 좌석 수
+        seat_name : 탐색할 좌석명 (default=None : 전체 탐색) 
+        '''
+        coord_seats = []   # 조건에 맞는 좌석 리스트
+        try:
+            #? 시간 체크
+            start_time = time.time()
+
+            css_selector = f'img[title*="{seat_name.strip()}"]'
+            #해당 등급의 좌석만 가져옴            
+            # img_elements = WebDriverWait(self.driver, 2).until(
+                # EC.presence_of_element_located((By.CSS_SELECTOR, css_selector)))
+            img_elements = self.driver.find_elements_by_css_selector(css_selector)
+            if len(img_elements) == 0:   #없으면 바로 return
+                return coord_seats
             
-    
+            for img in img_elements:
+                style = img.get_attribute("style")
+                left = None
+                top = None
+                
+                # style 속성에서 left와 top 값 추출
+                style_parts = style.split(";")
+                style_left_top = []
+                for part in style_parts:
+                    if "left:" in part:
+                        left = int(part.split(":")[1].strip()[:-2])  # "left:" 다음의 값
+                        style_left_top.insert(0,left)
+                    elif "top:" in part:
+                        top = int(part.split(":")[1].strip()[:-2])  # "top:" 다음의 값
+                        style_left_top.insert(1, top)
+                        
+                coord_seats.append([img, style_left_top])
+                    
+            coord_seats.sort(key=lambda x: (x[1][1], x[1][0]))   #top기준 오름차순정렬
+                
+                # if left is not None and top is not None:    #? 같은 값이 어떻게 처리..(ex. 200, 0 <-> 0, 200)
+                #     left_top_sum = left + top
+                #     if left_top_sum < min_left_top:
+                #         min_left_top = left_top_sum
+                #         min_img = img
+                #     if left_top_sum > max_left_top:
+                #         max_left_top = left_top_sum
+                #         max_img = img
+                        
+            logging.info(f"좌표 계산 시간 체크 :  {time.time() - start_time}")
+            # logging.info(f"가장 작은 left 값을 가진 img 태그: {min_img.get_attribute('outerHTML')}")
+            
+            # logging.info(f"가장 큰 left 값을 가진 img 태그: {max_img.get_attribute('outerHTML')}")
+            
+            return coord_seats    
+        except Exception as e:
+            logging.error(f"작업을 수행하는 동안 오류 발생: {e}")
+            return coord_seats
+
         
         
-    def seat_select(self, t_seat=1, seat_name=None):
+    def seat_select(self, t_seat=1, seat_name:list=None):
         '''
         좌석 선택함수
         t_seat : 선택할 좌석 수
         seat_name : 선택할 좌석명 (ex. R석, VIP석 등)
-        birth : 생일정보
         '''
         self.t_seat = t_seat
-        picked_seat = 0
-        self.driver.switch_to.default_content()   #!  상위로 이동
-        self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_name("ifrmSeat")))
+        self.seat_name = seat_name
+        self.picked_seat = 0
+        coord_seats = []  #남아있는 좌석 담을 리스트
+        
+        try:
+            self.driver.switch_to.default_content()   #!  상위로 이동
+            self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_name("ifrmSeat")))
+            self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_name("ifrmSeatDetail")))
+            self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'stySeat')))   #초록 이미지 css 경로
+            
+        except Exception as e:
+            logging.error(f'좌석 요소 탐색 실패 : {e}')
+            logging.info(f'팝업창이 있다면 닫아주세요')
+            time.sleep(2)
+            self.driver.switch_to.default_content()   #!  상위로 이동
+            # close_alert(self.driver)
+            waiting_order(self.driver)
+            self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_name("ifrmSeat")))
+            self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_name("ifrmSeatDetail")))
+            self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'stySeat')))   #초록 이미지 css 경로
+            
+        
         # self.driver.switch_to.frame(self.driver.find_element_by_name("ifrmSeat"))
-        self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_name("ifrmSeatDetail")))
         # self.driver.switch_to.frame(self.driver.find_element_by_name("ifrmSeatDetail"))
         
-        seats = 0
-        self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'stySeat')))   #초록 이미지 css 경로
+        seats = []
         try:
             if seat_name is not None : 
                 for i in range(len(seat_name)):
-                    logging.info("{} 좌석 선택 시도".format(seat_name[i][0]))
-                    #! 기본
-                    # xpath = f'//img[contains(@title,"{seat_name[i]}")]'
-                    #? 리터럴
-                    # xpath = f'//img[contains(@title,"{seat_name[i]}") and contains(@title,"1층") and contains(@title,"B")]'
+                    logging.info("{} 좌석 선택 시도".format(seat_name[i]))
                     try:
-                        css_selector = ''
-                        if len(seat_name[i]) != 1: #세부 옵션있으면
-                            css_selector = f'img[title*="{seat_name[i][0].strip()}"][title*="{seat_name[i][1].strip()}"]'
-                        else:
-                            css_selector = f'img[title*="{seat_name[i][0].strip()}"]'
-                        
-                        # self.wait.until(EC.presence_of_element_located((By.XPATH, xpath)))  #원하는 요소가 뜰때까지 대기'
-                        self.driver.find_element_by_css_selector(css_selector).click() 
-                        picked_seat += 1
+                        coord_seats = self.coord_seat_select(seat_name[i])
                     except:
-                        logging.info(f"{seat_name[i]} : 해당 좌석 없음")
+                        pass
+                    if len(coord_seats) !=  0:
+                        try:
+                            for j in range(self.t_seat):
+                                coord_seats[j][0].click() 
+                                logging.info(f'{coord_seats[j][0]} -- 좌석 선택 완료')
+                                self.picked_seat += 1 #선택 성공시 +1 
+                        except:
+                            logging.info(f"{seat_name[i]} : 해당 좌석 없음")
+                    else: 
+                        continue
                     # seats = self.driver.find_elements_by_xpath(xpath)   #*xpath로 탐색 
-                    if picked_seat >= self.t_seat:
+                    if self.picked_seat >= self.t_seat:
                         break
+            else:
+                logging.info("전체 좌석중 선택")
+                seats = self.driver.find_elements_by_class_name('stySeat')
+                logging.info("전체 남은 좌석 수: {}".format(len(seats)))
+                
         except:
             logging.info("입력한 등급의 좌석이 남아있지 않습니다. --> 남은 좌석 중 랜덤 선택")
-            
-            
-        seats = self.driver.find_elements_by_class_name('stySeat')
-        logging.info("전체 남은 좌석 수: {}".format(len(seats)))
+            seats = self.driver.find_elements_by_class_name('stySeat')
+            logging.info("전체 남은 좌석 수: {}".format(len(seats)))
         
-        # if seats == 0:
-            #남아있는 좌석 수
-        try:    
-            self.seat_count = self.t_seat-picked_seat #남은 예매할 좌석의 수
-            if self.seat_count > len(seats):   # 잡을 좌석 수 > 남은 좌석 수
-                self.seat_count = len(seats)                 #남은 좌석만큼 가져오기
-            else:
-                # self.seat_count = self.t_seat             #입력한 좌석 수만큼 가져오기
-                pass
-            for i in range(0, self.seat_count):
+        try:
+            for i in range(len(seats)):
                 try:
-                    seats[i].click()     #시트 클릭
-                except :
-                    logging.error("좌석 선택 에러")
-            logging.info("좌석 선택 완료!")
-        except UnexpectedAlertPresentException as e:
-            logging.error(f"ERROR: {e}")
+                    if self.picked_seat < self.t_seat:
+                        seats[i].click()
+                        self.picked_seat += 1
+                    if self.picked_seat >= self.t_seat:
+                        logging.info("지정 영역 외랜덤 좌석 선택완료")
+                        break     
+                except Exception as e:
+                    logging.error(f"중복 좌석 선택 에러 : {e}")
+        except Exception as e:
+            logging.error(f"좌석 선택 에러 : 남은 좌석없음 -- {e}")
+        
+        try:    
+            self.driver.switch_to.default_content()
+            self.driver.switch_to.frame(self.driver.find_element_by_name("ifrmSeat"))   #이전 프레임으로 돌아가기
+            self.driver.find_element_by_id("NextStepImage").click()
+            if close_alert(self.driver)  :
+                logging.info("이선좌 오류")
+                self.seat_select(t_seat, seat_name)
+                
+        except Exception as e:
             close_default_alert(self.driver)
+            logging.error(f"좌석 선택에러 : {e} ")
             self.seat_select(t_seat, seat_name)
-            
-            
-        self.driver.switch_to.default_content()
-        self.driver.switch_to.frame(self.driver.find_element_by_name("ifrmSeat"))   #이전 프레임으로 돌아가기
-        self.driver.find_element_by_id("NextStepImage").click()
-
+        
+        
 
 
 
@@ -415,7 +508,7 @@ class TicketModule():
                 # Select 객체 생성
                 select = Select(select_element)
                 # 원하는 <option> 요소 선택
-                select.select_by_value(str(self.seat_count))   
+                select.select_by_value(str(self.picked_seat))   
             #재관람
             elif opt == 1:
                 # pricegradename 값
@@ -429,14 +522,15 @@ class TicketModule():
                 # Select 객체 생성
                 select = Select(select_element)
                 # 원하는 <option> 요소 선택
-                select.select_by_value(str(self.seat_count))  
+                select.select_by_value(str(self.picked_seat))  
                 
             self.driver.switch_to.default_content() 
             self.driver.find_element_by_id("SmallNextBtnImage").click()
         except Exception as e:
             logging.error(f"권종 선택 중 오류 --- {e}")
-            go_navi(self.driver, opt=2)
-        close_alert(self.driver)            
+            close_alert(self.driver)   
+            self.seat_select(self.t_seat, self.seat_name)
+            # go_navi(self.driver, opt=2)
 
             
         
@@ -458,7 +552,7 @@ class TicketModule():
             self.wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="checkAll"]'))).click()
             self.driver.switch_to.default_content()
             ##! 실사용시 주석 해제 후 사용할 것!!!
-            # self.driver.find_element_by_xpath('//*[@id="LargeNextBtnImage"]').click()    #?실결제는 주석처리
+            self.driver.find_element_by_xpath('//*[@id="La/geNextBtnImage"]').click()    #?실결제는 주석처리
             
         def kakao(): #카카오
             self.wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="Payment_22084"]/td/input'))).click()
