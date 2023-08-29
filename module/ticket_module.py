@@ -167,15 +167,16 @@ class TicketModule():
                         change = t_mon-current_mon
                     else:
                         pass
+                    scroll_to(self.driver, ['document.body.scrollWidth', 0])
                     for _ in range(change):
-                        scroll_to(self.driver, ['document.body.scrollWidth', 0])
-                        self.driver.find_element(By.CSS_SELECTOR, "li[data-view='month next']").click()
+                        next.click()
                 try:
                     # print(self.date_entry.get(), "날짜를 불러라")
                     date_picker = self.driver.find_element(By.CSS_SELECTOR, "ul[data-view='days']")
-                    blank = len(date_picker.find_elements(By.CLASS_NAME, "muted"))
-                    list_num = int(date[1])+blank
-                    self.driver.find_element(By.XPATH, f'//*[@id="productSide"]/div/div[1]/div[1]/div[2]/div/div/div/div/ul[3]/li[{list_num}]').click()   
+                    dates = date_picker.find_elements(By.TAG_NAME, "li")
+                    for d in dates:
+                        if int(d.text) == date[1]:
+                            d.click()   
                     break
                 except NoSuchElementException:    #찾는 요소 없을 경우 직링함수 재실행
                     self.common_link_go(self.mc_code, True)
