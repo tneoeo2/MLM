@@ -411,21 +411,28 @@ class TicketModule():
         coord_seats = []  #남아있는 좌석 담을 리스트
         
         try:
+            time.sleep(0.5)
+            self.driver.switch_to_window(self.driver.window_handles[-1])
             self.driver.switch_to.default_content()   #!  상위로 이동
-            self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_name("ifrmSeat")))
-            self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_name("ifrmSeatDetail")))
+            self.wait.until(EC.presence_of_element_located((By.ID, "ifrmSeat")))
+            self.driver.switch_to.frame(self.driver.find_element_by_name("ifrmSeat"))
+            self.wait.until(EC.presence_of_element_located((By.ID, "ifrmSeatDetail")))
+            self.driver.switch_to.frame(self.driver.find_element_by_name("ifrmSeatDetail")) #초록 이미지 css 경로
             self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'stySeat')))   #초록 이미지 css 경로
-            
         except Exception as e:
             logging.error(f'좌석 요소 탐색 실패 : {e}')
             logging.info(f'팝업창이 있다면 닫아주세요')
             time.sleep(2)
-            self.driver.switch_to.default_content()   #!  상위로 이동
-            # close_alert(self.driver)
-            waiting_order(self.driver)
-            self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_name("ifrmSeat")))
-            self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_name("ifrmSeatDetail")))
-            self.wait.until(EC.presence_of_element_located((By.CLASS_NAME, 'stySeat')))   #초록 이미지 css 경로
+            logging.info(f'재시도')
+            try:
+                self.driver.switch_to.default_content()   #!  상위로 이동
+                self.driver.switch_to.frame(self.driver.find_element_by_name("ifrmSeat"))
+                self.driver.switch_to.frame(self.driver.find_element_by_name("ifrmSeatDetail")) #초록 이미지 css 경로
+            except:
+                logging.error("Failed to Retry")
+                waiting_order(self.driver)
+                self.seat_select(t_seat, seat_name)
+                return
             
         
         # self.driver.switch_to.frame(self.driver.find_element_by_name("ifrmSeat"))
