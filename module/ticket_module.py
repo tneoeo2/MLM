@@ -196,19 +196,25 @@ class TicketModule():
         self.driver.find_element(By.XPATH, times_loc)
         current_windows = self.driver.window_handles
         self.driver.find_element_by_xpath('//*[@id="productSide"]/div/div[2]/a[1]').click()
+    
         try:
-            logging.info("토핑 선예매 팝업")
             time.sleep(0.5)
             self.ticket_windows = switch_window(self.driver, current_windows)
-            self.driver.find_element(By.ID, 'Notice').click()
-            window_handles = self.driver.window_handles
-            self.driver.switch_to_window(window_handles[-1])
-            self.driver.find_element_by_xpath('//*[@id="productSide"]/div/div[2]/a[1]').click()
-            time.sleep(0.5)
-            self.ticket_windows = switch_window(self.driver, current_windows)
+            try:
+                # WebDriverWait(self.driver, 1).until(EC.presence_of_element_located((By.ID, "ifrmSeat")))
+                # logging.info("토핑 선예매 팝업")
+                # self.ticket_windows = switch_window(self.driver, current_windows)
+                WebDriverWait(self.driver, 1).until(EC.presence_of_element_located((By.ID, "Notice"))).click()
+                window_handles = self.driver.window_handles
+                self.driver.switch_to_window(window_handles[-1])
+                self.driver.find_element_by_xpath('//*[@id="productSide"]/div/div[2]/a[1]').click()
+                self.ticket_windows = switch_window(self.driver, current_windows)
+            except:
+                logging.info("토핑 팝업 없음")
         except Exception as e:
-            logging.error(f'팝업닫기중 오류 ---{e}')
+            logging.error(f'좌석 예매창 가기 실패---{e}')
             self.ticket_windows = switch_window(self.driver, current_windows)
+            self.common_date_select(date, times)
         # waiting_order(self.driver)
         
      
