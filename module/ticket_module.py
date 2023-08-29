@@ -154,6 +154,7 @@ class TicketModule():
         # common_close_alert(self.driver)
         current = self.driver.find_element(By.CSS_SELECTOR, "li[data-view='month current']")
         current_mon = int(current.text.split(".")[-1].strip()) #현재 월 확인
+        next = self.driver.find_element(By.CSS_SELECTOR, "li[data-view='month next']")
         t_mon = int(date[0])
         logging.info(f"Current month: {current_mon}")
         while (True):
