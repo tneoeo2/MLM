@@ -39,7 +39,7 @@ def close_alert(driver):
         
 def common_close_alert(driver):
     try:
-        alert = driver.find_element_by_class_name("popupCloseBtn")
+        alert = driver.find_element_by_class_name("popupCheckLabel")
         # alert = driver.switch_to.alert
         if alert is not None:
             logging.info("popup닫기")
@@ -141,7 +141,7 @@ class TicketModule():
             if alert : 
                 common_close_alert(self.driver)
         except Exception as e:
-            self.common_link_go(mc_code, alert)
+            self.common_link_go(mc_code, alert=True)
             logging.error(f"Exception e : {e}")
             
     def common_date_select(self, date:list, times):
@@ -218,19 +218,32 @@ class TicketModule():
             time.sleep(0.5)
             self.ticket_windows = switch_window(self.driver, current_windows)
             try:
+                '''
                 # WebDriverWait(self.driver, 1).until(EC.presence_of_element_located((By.ID, "ifrmSeat")))
                 # logging.info("토핑 선예매 팝업")
                 # self.ticket_windows = switch_window(self.driver, current_windows)
-                WebDriverWait(self.driver, 1).until(EC.presence_of_element_located((By.ID, "Notice"))).click()
+                WebDriverWait(self.driver, 0.5).until(EC.presence_of_element_located((By.ID, "Notice"))).click()
                 window_handles = self.driver.window_handles
                 self.driver.switch_to_window(window_handles[-1])
                 self.driver.find_element_by_xpath('//*[@id="productSide"]/div/div[2]/a[1]').click()
                 self.ticket_windows = switch_window(self.driver, current_windows)
-            except:
-                logging.info("토핑 팝업 없음")
+                '''
+                self.ticket_windows = switch_window(self.driver, current_windows)
+                logging.info(f'예매창 전환 확인 : {self.driver.find_element(By.ID, "divBookMain")}')  #창 전환 확인용
+            except Exception as e:
+                while True:
+                    logging.error(f"토핑 팝업 제거 필요: {e}")
+                    time.sleep(0.5)
+                    try:
+                        self.driver.find_element(By.ID, "divBookMain")  #창 전환 확인용
+                        break
+                    except Exception:
+                        continue
+                        
+                    
         except Exception as e:
             logging.error(f'좌석 예매창 가기 실패---{e}')
-            self.ticket_windows = switch_window(self.driver, current_windows)
+            # self.common_link_go(self.mc_code)
             self.common_date_select(date, times)
         # waiting_order(self.driver)
         
@@ -505,7 +518,7 @@ class TicketModule():
             self.driver.switch_to.default_content()
             self.driver.switch_to.frame(self.driver.find_element_by_name("ifrmSeat"))   #이전 프레임으로 돌아가기
             self.driver.find_element_by_id("NextStepImage").click()
-            if close_alert(self.driver)  :
+            if close_default_alert(self.driver)  :
                 logging.info("이선좌 오류")
                 self.seat_select(t_seat, seat_name)
                 
