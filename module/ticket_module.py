@@ -151,14 +151,23 @@ class TicketModule():
         times : 회차정보 (1부터 센다)
         '''
         logging.info("common_date_select 작동 확인")
-        # common_close_alert(self.driver)
-        current = self.driver.find_element(By.CSS_SELECTOR, "li[data-view='month current']")
-        current_mon = int(current.text.split(".")[-1].strip()) #현재 월 확인
-        next = self.driver.find_element(By.CSS_SELECTOR, "li[data-view='month next']")
-        t_mon = int(date[0])
-        logging.info(f"Current month: {current_mon}")
-        while (True):
+        try:
+            self.driver.refresh()
+        except Exception:
+            logging.info("창 새로고침")
+        try:# common_close_alert(self.driver)
+            current = self.driver.find_element(By.CSS_SELECTOR, "li[data-view='month current']")
+            current_mon = int(current.text.split(".")[-1].strip()) #현재 월 확인
+            next = self.driver.find_element(By.CSS_SELECTOR, "li[data-view='month next']")
+            t_mon = int(date[0])
+            logging.info(f"Current month: {current_mon}")
+        except Exception as e:
+            self.common_date_select(date, times)
+            return
+        flg = True
+        while (flg):
             try:
+                logging.info(f"{date[0]}월 선택")
                 if t_mon == current_mon:   #입력한 월 가져오기
                         pass
                 elif t_mon != current_mon:  #입력한 월이 이번달이 아닌 경우
@@ -172,22 +181,29 @@ class TicketModule():
                     for _ in range(change):
                         next.click()
                 try:
-                    # print(self.date_entry.get(), "날짜를 불러라")
+                    logging.info(f"{date[1]}일 선택")
                     date_picker = self.driver.find_element(By.CSS_SELECTOR, "ul[data-view='days']")
                     dates = date_picker.find_elements(By.TAG_NAME, "li")
                     for d in dates:
                         if int(d.text) == date[1]:
                             d.click()   
-                    break
-                except NoSuchElementException:    #찾는 요소 없을 경우 직링함수 재실행
+                            if d.get_attribute("class") !="picked":
+                                raise NoSuchElementException("선택할수 없는 날짜: 날짜 로딩 확인")
+                            else:
+                                flg = False
+                            break
+                except NoSuchElementException  as e:    #찾는 요소 없을 경우 직링함수 재실행
+                    logging.error(f"날짜 선택 에러 1: {e}")
                     self.common_link_go(self.mc_code, True)
                     self.common_date_select(date, times)
                     return
-            except NoSuchElementException: 
+            except NoSuchElementException as e: 
+                logging.error(f"날짜 선택 에러 2: {e}")
                 self.common_link_go(self.mc_code, True)
                 self.common_date_select(date, times)
                 return
-            except ElementClickInterceptedException:
+            except ElementClickInterceptedException as e:
+                logging.error(f"날짜 선택 에러 3: {e}")
                 self.common_link_go(self.mc_code, True)
                 self.common_date_select(date, times)
                 return
