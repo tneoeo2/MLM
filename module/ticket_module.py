@@ -439,7 +439,7 @@ class TicketModule():
         self.seat_name = seat_name
         self.picked_seat = 0
         coord_seats = []  #남아있는 좌석 담을 리스트
-        
+        logging.info("좌석 선택 수행")
         try:
             time.sleep(0.5)
             self.driver.switch_to_window(self.driver.window_handles[-1])
@@ -470,7 +470,7 @@ class TicketModule():
         
         seats = []
         try:
-            if seat_name is not None : 
+            if len(seat_name) != 0: 
                 for i in range(len(seat_name)):
                     logging.info("{} 좌석 선택 시도".format(seat_name[i]))
                     try:
@@ -500,7 +500,7 @@ class TicketModule():
             seats = self.driver.find_elements_by_class_name('stySeat')
             logging.info("전체 남은 좌석 수: {}".format(len(seats)))
         
-        try:
+        try: 
             for i in range(len(seats)):
                 try:
                     if self.picked_seat < self.t_seat:
@@ -574,6 +574,7 @@ class TicketModule():
             logging.error(f"권종 선택 중 오류 --- {e}")
             close_alert(self.driver)   
             self.seat_select(self.t_seat, self.seat_name)
+            self.discount(opt)
             # go_navi(self.driver, opt=2)
 
             
