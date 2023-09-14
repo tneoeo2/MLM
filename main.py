@@ -66,11 +66,12 @@ class TicketThread():
         logging.info("---티켓팅 모듈 실행---")
         self.tm = TicketModule(self.driver)
         self.tm.login_go(INTERPARK_LOGIN_URL, self.account[0], self.account[1])
-    
+        self.tm.common_link_go(TEST_MC, True)
+        
     def get_ticket(self):
         logging.info('---공연선택 시작---')
         #!공연선택
-        self.tm.common_link_go(TEST_MC)
+        self.tm.common_link_go(TEST_MC, False)
         #!날짜 선택[현재월+n,n일, n회차] & 회차 선택
         self.tm.common_date_select(self.t_date, self.t_time)
         #!캡차 유무 선택 
