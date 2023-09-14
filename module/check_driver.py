@@ -22,5 +22,4 @@ class ChromeCheck():
     def get_driver(self):   #? 최신버전 크롬드라이버 리턴
         # print("get_driver---- ", self.driver)
         return self.driver
-    
 
