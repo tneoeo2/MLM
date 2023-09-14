@@ -64,7 +64,9 @@ def go_navi(driver, opt=2):
 # 대기열 떳을 경우 기다리기
 def waiting_order(driver):
     try:
-        is_waiting =  WebDriverWait(driver, 4).until(EC.presence_of_element_located(By.CLASS_NAME, "ticketWaiting__order"))
+        is_waiting =  WebDriverWait(driver, 3).until(
+            EC.presence_of_element_located((By.LINK_TEXT, "대기순서"))
+            )
         while True:
             if is_waiting :
                 # WebDriverWait(driver, 4).until(EC.presence_of_element_located((By.CLASS_NAME, 'notranslate'))) 
@@ -101,12 +103,16 @@ def switch_window(driver, current_windows):
                 new_window_handle = window_handle
                 break
             
-        if new_window_handle:
+        if new_window_handle is not None:
             # 팝업 윈도우로 전환s
             driver.switch_to.window(new_window_handle)
             logging.info("driver switched")
             return new_window_handle
-    except:
+        else:
+            logging.info("새창 없음 - 기존 창으로 복귀")
+            driver.switch_to.window(current_windows[-1])
+            return current_windows[-1]
+    except Exception as e:
         logging.error("Failed to switch")
 
 
@@ -202,7 +208,7 @@ class TicketModule():
                 self.common_link_go(self.mc_code, True)
                 self.common_date_select(date, times)
                 return
-            except ElementClickInterceptedException as e:
+            except Exception as e:
                 logging.error(f"날짜 선택 에러 3: {e}")
                 self.common_link_go(self.mc_code, True)
                 self.common_date_select(date, times)
@@ -212,6 +218,7 @@ class TicketModule():
         times_loc = f'//a[contains(@data-text,"{times}")]'
         self.driver.find_element(By.XPATH, times_loc)
         current_windows = self.driver.window_handles
+        self.current_window = self.driver.current_window_handle
         self.driver.find_element_by_xpath('//*[@id="productSide"]/div/div[2]/a[1]').click()
     
         try:
@@ -235,17 +242,16 @@ class TicketModule():
                     logging.error(f"토핑 팝업 제거 필요: {e}")
                     time.sleep(0.5)
                     try:
+                        switch_window(self.driver, current_windows)
                         self.driver.find_element(By.ID, "divBookMain")  #창 전환 확인용
                         break
                     except Exception:
                         continue
-                        
                     
         except Exception as e:
             logging.error(f'좌석 예매창 가기 실패---{e}')
-            # self.common_link_go(self.mc_code)
+            self.common_link_go(self.mc_code)
             self.common_date_select(date, times)
-        # waiting_order(self.driver)
         
      
     def link_go(self, mc_code, alert=False):  #티켓예매페이지로 이동
@@ -289,10 +295,10 @@ class TicketModule():
                     self.driver.find_element_by_link_text(date[1]).click()   
                     break
                 except NoSuchElementException:    #찾는 요소 없을 경우 직링함수 재실행
-                    self.link_go(self.mc_code, True)
+                    self.common_link_go(self.mc_code, False)
                     break
             except NoSuchElementException: 
-                self.link_go(self.mc_code, True)
+                self.common_link_go(self.mc_code, False)
                 break
         self.wait.until(EC.element_to_be_clickable(     
             (By.XPATH, '/html/body/div/div[3]/div[1]/div/span/ul/li[' + times + ']/a'))).click()  #회차 클릭
@@ -317,7 +323,11 @@ class TicketModule():
                     close_alert(self.driver)
                     logging.error(f"캡차 이미지 없음 : {e}")
                     waiting_order(self.driver)
-                    self.driver.switch_to.frame(self.driver.find_element(By.ID, "ifrmSeat"))
+                    try:
+                        self.driver.switch_to.frame(self.driver.find_element(By.ID, "ifrmSeat"))
+                    except Exception as e:
+                        logging.error(f"캡차 인식 시도 중 오류-- {e}")
+                        self.common_link_go(self.mc_code, False)
                 # logging.info("캡차 인식 실행3")
                 img_captcha = self.wait.until(EC.presence_of_element_located((By.ID, 'imgCaptcha')))
                 src = img_captcha.get_attribute('src')
@@ -597,7 +607,7 @@ class TicketModule():
             self.wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="checkAll"]'))).click()
             self.driver.switch_to.default_content()
             ##! 실사용시 주석 해제 후 사용할 것!!!
-            self.driver.find_element_by_xpath('//*[@id="La/geNextBtnImage"]').click()    #?실결제는 주석처리
+            self.driver.find_element_by_xpath('//*[@id="LargeNextBtnImage"]').click()    #?실결제는 주석처리
             
         def kakao(): #카카오
             self.wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="Payment_22084"]/td/input'))).click()
@@ -616,6 +626,7 @@ class TicketModule():
             self.driver.switch_to.default_content()
             self.wait.until(EC.frame_to_be_available_and_switch_to_it(self.driver.find_element_by_xpath('//*[@id="ifrmBookStep"]')))
             #self.driver.switch_to.frame(self.driver.find_element_by_xpath('//*[@id="ifrmBookStep"]'))
+            self.wait.until(EC.element_to_be_clickable((By.XPATH, '//*[@id="Delivery"]'))).click()
             logging.info("생일 입력 확인 : {}".format(self.birth))
             self.wait.until(EC.element_to_be_clickable((By.CSS_SELECTOR, 'input#YYMMDD'))).send_keys(birth)    #생년월일 입력
             # self.driver.find_element_by_xpath('//*[@id="SmallNextBtnImage"]').click()
